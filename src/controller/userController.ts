@@ -1,27 +1,30 @@
 import { Request, Response } from "express";
 import { userModel } from "../models/userModel";
 import validator from "validator";
+import {z} from "zod";
 import bcrypt from "bcryptjs";
 
+const loginSchema = z.object({
+  email: z.string().email({ message: "Invalid email format" }),
+  password: z.string().min(1, { message: "Password is required" })
+});
+
+const signupSchema = z.object({
+  firstName: z.string().min(1, { message: "First name is required" }),
+  lastName: z.string().min(1, { message: "Last name is required" }),  
+  email: z.string().email({ message: "Invalid email format" }),
+  password: z.string().min(6, { message: "Password must be at least 6 characters long" })
+});
+
 export const signup = async (req: Request, res: Response) => {
-    try{
-    const { firstName, lastName, email, password } = req.body;
-    if (!firstName || !lastName || !email || !password) {
-      res.status(400).json({ message: "All fields are required" });
+  try {
+    const result = signupSchema.safeParse(req.body);
+    if (!result.success) {
+      res.status(400).json({ errors: result.error.errors });
       return;
     }
 
-    if (!validator.isEmail(email)) {
-      res.status(400).json({ message: "Invalid email format" });
-      return;
-    }
-
-    if (!validator.isLength(password, { min: 6, max: 30 })) {
-      res.status(400).json({
-        message: "Password must be at least 6 characters long and less than 30 characters long"
-      });
-      return;
-    }
+    const { firstName, lastName, email, password } = result.data;
 
     const existingUser = await userModel.findOne({ where: { email } });
     if (existingUser) {
@@ -52,62 +55,60 @@ export const signup = async (req: Request, res: Response) => {
     };
 
     res.status(201).json({ message: "User created successfully", user: userDetails });
-    return;
-}
-    catch(error: any){
-        console.error(error);
-        res.status(500).json({
-            success: false,
-            message: error.message || "Internal Server Error",
-            error: error.toString()
-        });
-        return;
-    }
+  } catch (error: any) {
+    console.error(error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Internal Server Error",
+      error: error.toString()
+    });
+  }
 };
 
+
 export const login = async (req: Request, res: Response) => {
-    try {
-      const { email, password } = req.body;
-  
-      if (!email || !password) {
-        res.status(400).json({ message: "Email and password are required" });
-        return;
-      }
-  
-      const user = await userModel.findOne({ where: { email } });
-      if (!user) {
-        res.status(400).json({ message: "Invalid email credentials" });
-        return;
-      }
-  
-      const isPasswordValid = await bcrypt.compare(password, user.password);
-  
-      if (!isPasswordValid) {
-        res.status(400).json({ message: "Invalid password credentials" });
-        return;
-      }
-  
-      const token = user.getJWT();
-  
-      req.session['user'] = {
-        id: user.id,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        email: user.email,
-        token
-      };
-  
-      res.cookie("token", token, { httpOnly: true, expires: new Date(Date.now() + 8 * 3600000) });
-  
-      res.status(200).json({ message: "Login successful", user: req.session['user'], token });
-    } catch (error: any) {
-      console.error("Login error:", error);
-      res.status(500).json({
-        success: false,
-        message: error.message || "Internal Server Error",
-        error: error.toString()
-      });
+  try {
+    const result = loginSchema.safeParse(req.body);
+    if (!result.success) {
+      res.status(400).json({ errors: result.error.errors });
+      return;
     }
+
+    const { email, password } = result.data;
+
+    const user = await userModel.findOne({ where: { email } });
+    if (!user) {
+      res.status(400).json({ message: "Invalid email credentials" });
+      return;
+    }
+
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) {
+      res.status(400).json({ message: "Invalid password credentials" });
+      return;
+    }
+
+    const token = user.getJWT();
+
+    req.session['user'] = {
+      id: user.id,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email,
+      token
+    };
+
+    res.cookie("token", token, { httpOnly: true, expires: new Date(Date.now() + 8 * 3600000) });
+
+    res.status(200).json({ message: "Login successful", user: req.session['user'], token });
+  } catch (error: any) {
+    console.error("Login error:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Internal Server Error",
+      error: error.toString()
+    });
+  }
 };
   
   export const logout = (req: Request, res: Response) => {
