@@ -6,6 +6,7 @@ import cors from "cors";
 import session from "express-session";
 import SequelizeStoreInit from "connect-session-sequelize";
 import cookieParser from "cookie-parser";
+import sessionRouter from "./routes/session";
 
 dotenv.config();
 
@@ -27,6 +28,7 @@ app.use(express.json());
 
 const sessionStore = new SequelizeStore({
   db: sequelize,
+  tableName: "session"
 });
 
 app.use(
@@ -46,6 +48,7 @@ app.use(
 sessionStore.sync();
 
 app.use("/", userRouter);
+app.use("/sessions", sessionRouter);
 
 app.listen(4000, async () => {
   console.log("Server is listening at port 4000");
@@ -54,11 +57,11 @@ app.listen(4000, async () => {
     await sequelize
       .sync()
       .then(() => console.log("Database connected successfully!"))
-      .catch((err: unknown) => {
+      .catch((err: any) => {
         console.error("Database cannot be connected", err);
-        throw new Error(String(err));
+        throw new Error(err.toString());
       });
-  } catch (e) {
+  } catch (e: any) {
     console.error(e);
     process.exit(1);
   }

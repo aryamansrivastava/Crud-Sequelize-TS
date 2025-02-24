@@ -3,27 +3,33 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.updateUser = exports.deleteUser = exports.getUserById = exports.getUsers = exports.logout = exports.login = exports.signup = void 0;
+exports.updateUser = exports.deleteUser = exports.getUserById = exports.getUsers = exports.createUser = exports.logout = exports.login = exports.signup = void 0;
 const userModel_1 = require("../models/userModel");
 const validator_1 = __importDefault(require("validator"));
-const bcrypt_1 = __importDefault(require("bcrypt"));
+const zod_1 = require("zod");
+const bcryptjs_1 = __importDefault(require("bcryptjs"));
+const loginSchema = zod_1.z.object({
+    email: zod_1.z.string().email({ message: "Invalid email format" }),
+    password: zod_1.z.string().min(1, { message: "Password is required" })
+});
+const signupSchema = zod_1.z.object({
+    firstName: zod_1.z.string().min(1, { message: "First name is required" }),
+    lastName: zod_1.z.string().min(1, { message: "Last name is required" }),
+    email: zod_1.z.string().email({ message: "Invalid email format" }),
+    password: zod_1.z.string().min(6, { message: "Password must be at least 6 characters long" })
+});
 const signup = async (req, res) => {
     try {
-        const { firstName, lastName, email, password } = req.body;
-        if (!firstName || !lastName || !email || !password) {
-            return res.status(400).json({ message: "All fields are required" });
+        const result = signupSchema.safeParse(req.body);
+        if (!result.success) {
+            res.status(400).json({ errors: result.error.errors });
+            return;
         }
-        if (!validator_1.default.isEmail(email)) {
-            return res.status(400).json({ message: "Invalid email format" });
-        }
-        if (!validator_1.default.isLength(password, { min: 6, max: 30 })) {
-            return res.status(400).json({
-                message: "Password must be at least 6 characters long and less than 30 characters long"
-            });
-        }
+        const { firstName, lastName, email, password } = result.data;
         const existingUser = await userModel_1.userModel.findOne({ where: { email } });
         if (existingUser) {
-            return res.status(409).json({ message: "User already exists" });
+            res.status(409).json({ message: "User already exists" });
+            return;
         }
         const newUser = await userModel_1.userModel.create({ firstName, lastName, email, password });
         let token;
@@ -32,7 +38,8 @@ const signup = async (req, res) => {
         }
         catch (error) {
             await newUser.destroy();
-            return res.status(500).json({ message: "JWT_SECRET is missing or invalid" });
+            res.status(500).json({ message: "Token can't be generated" });
+            return;
         }
         res.cookie("token", token, { httpOnly: true, expires: new Date(Date.now() + 8 * 3600000) });
         const userDetails = {
@@ -43,11 +50,11 @@ const signup = async (req, res) => {
             updatedAt: newUser.updatedAt,
             createdAt: newUser.createdAt
         };
-        return res.status(201).json({ message: "User created successfully", user: userDetails });
+        res.status(201).json({ message: "User created successfully", user: userDetails });
     }
     catch (error) {
         console.error(error);
-        return res.status(500).json({
+        res.status(500).json({
             success: false,
             message: error.message || "Internal Server Error",
             error: error.toString()
@@ -55,22 +62,26 @@ const signup = async (req, res) => {
     }
 };
 exports.signup = signup;
-const login = (req, res) => {
-    return Promise.resolve().then(async () => {
-        const { email, password } = req.body;
-        if (!email || !password) {
-            return res.status(400).json({ message: "Email and password are required" });
+const login = async (req, res) => {
+    try {
+        const result = loginSchema.safeParse(req.body);
+        if (!result.success) {
+            res.status(400).json({ errors: result.error.errors });
+            return;
         }
+        const { email, password } = result.data;
         const user = await userModel_1.userModel.findOne({ where: { email } });
         if (!user) {
-            return res.status(400).json({ message: "Invalid email credentials" });
+            res.status(400).json({ message: "Invalid email credentials" });
+            return;
         }
-        const isPasswordValid = await bcrypt_1.default.compare(password, user.password);
+        const isPasswordValid = await bcryptjs_1.default.compare(password, user.password);
         if (!isPasswordValid) {
-            return res.status(400).json({ message: "Invalid password credentials" });
+            res.status(400).json({ message: "Invalid password credentials" });
+            return;
         }
         const token = user.getJWT();
-        req.session.user = {
+        req.session['user'] = {
             id: user.id,
             firstName: user.firstName,
             lastName: user.lastName,
@@ -78,34 +89,56 @@ const login = (req, res) => {
             token
         };
         res.cookie("token", token, { httpOnly: true, expires: new Date(Date.now() + 8 * 3600000) });
-        const userDetails = {
-            id: user.id,
-            firstName: user.firstName,
-            lastName: user.lastName,
-            email: user.email,
-            updatedAt: user.updatedAt,
-            createdAt: user.createdAt
-        };
-        res.status(200).json({ message: "Login successful", user: req.session.user, token });
-    }).catch((error) => {
+        res.status(200).json({ message: "Login successful", user: req.session['user'], token });
+    }
+    catch (error) {
         console.error("Login error:", error);
-        res.status(500).json({ message: error.message });
-    });
+        res.status(500).json({
+            success: false,
+            message: error.message || "Internal Server Error",
+            error: error.toString()
+        });
+    }
 };
 exports.login = login;
 const logout = (req, res) => {
     req.session.destroy((err) => {
         if (err) {
             console.error("Logout error:", err);
-            return res.status(500).json({ message: "Logout failed" });
+            res.status(500).json({ message: "Logout failed" });
+            return;
         }
         res.clearCookie("token");
         res.status(200).json({ message: "Logged out successfully" });
     });
 };
 exports.logout = logout;
-const getUsers = (req, res) => {
-    return Promise.resolve().then(async () => {
+const createUser = async (req, res) => {
+    try {
+        const { firstName, lastName, email, password } = req.body;
+        if (!firstName || !lastName || !email || !password) {
+            res.status(400).json({ message: "All fields are required" });
+            return;
+        }
+        if (!validator_1.default.isEmail(email)) {
+            res.status(400).json({ message: "Invalid email format" });
+            return;
+        }
+        if (!validator_1.default.isLength(password, { min: 6 })) {
+            res.status(400).json({ message: "Password must be at least 6 characters long" });
+            return;
+        }
+        const newUser = await userModel_1.userModel.create({ firstName, lastName, email, password });
+        res.status(201).json({ message: "User created successfully", user: newUser });
+    }
+    catch (error) {
+        console.error("Error creating user:", error);
+        res.status(500).json({ message: error.message || "Internal Server Error" });
+    }
+};
+exports.createUser = createUser;
+const getUsers = async (req, res) => {
+    try {
         let { page, size } = req.query;
         const currentPage = parseInt(page) || 1;
         const limit = parseInt(size) || 6;
@@ -122,77 +155,95 @@ const getUsers = (req, res) => {
             totalPages: Math.ceil(count / limit),
             currentPage
         });
-    }).catch((error) => {
+    }
+    catch (error) {
         console.error("Get Users error:", error);
-        res.status(500).json({ message: error.message });
-    });
+        res.status(500).json({
+            success: false,
+            message: error.message || "Internal Server Error",
+            error: error.toString()
+        });
+    }
 };
 exports.getUsers = getUsers;
-const getUserById = (req, res) => {
-    return Promise.resolve().then(async () => {
+const getUserById = async (req, res) => {
+    try {
         const user = await userModel_1.userModel.findByPk(req.params.id, {
             attributes: ["id", "firstName", "lastName", "email", "createdAt", "updatedAt"]
         });
         if (!user) {
-            return res.status(404).json({ message: "User not found" });
+            res.status(404).json({ message: "User not found" });
+            return;
         }
         res.status(200).json({ data: user });
-    }).catch((error) => {
+    }
+    catch (error) {
         console.error("Get User by ID error:", error);
-        res.status(500).json({ message: error.message });
-    });
+        res.status(500).json({
+            success: false,
+            message: error.message || "Internal Server Error",
+            error: error.toString()
+        });
+    }
 };
 exports.getUserById = getUserById;
-const deleteUser = (req, res) => {
-    return Promise.resolve().then(async () => {
+const deleteUser = async (req, res) => {
+    try {
         const user = await userModel_1.userModel.findByPk(req.params.id);
         if (!user) {
-            return res.status(404).json({ message: "User not found" });
+            res.status(404).json({ message: "User not found" });
+            return;
         }
         await user.destroy();
         res.status(200).json({ message: "User deleted successfully!" });
-    }).catch((error) => {
+    }
+    catch (error) {
         console.error("Delete User error:", error);
-        res.status(500).json({ message: error.message });
-    });
+        res.status(500).json({
+            success: false,
+            message: error.message || "Internal Server Error",
+            error: error.toString()
+        });
+    }
 };
 exports.deleteUser = deleteUser;
-const updateUser = (req, res) => {
-    return Promise.resolve().then(async () => {
+const updateUser = async (req, res) => {
+    try {
         const { firstName, lastName, email, password } = req.body;
         if (!firstName || !lastName || !email) {
-            return res.status(400).json({ message: "First name, last name, and email are required" });
+            res.status(400).json({ message: "First name, last name, and email are required" });
+            return;
         }
         if (!validator_1.default.isEmail(email)) {
-            return res.status(400).json({ message: "Invalid email format" });
+            res.status(400).json({ message: "Invalid email format" });
+            return;
         }
         const user = await userModel_1.userModel.findByPk(req.params.id);
         if (!user) {
-            return res.status(404).json({ message: "User not found" });
+            res.status(404).json({ message: "User not found" });
+            return;
         }
         user.firstName = firstName;
         user.lastName = lastName;
         user.email = email;
         if (password) {
             if (!validator_1.default.isLength(password, { min: 6 })) {
-                return res.status(400).json({ message: "Password must be at least 6 characters long" });
+                res.status(400).json({ message: "Password must be at least 6 characters long" });
+                return;
             }
             user.password = password;
         }
         await user.save();
         res.status(200).json({ message: "User updated successfully", user });
-    }).catch((error) => {
+    }
+    catch (error) {
         console.error("Update User error:", error);
-        res.status(500).json({ message: error.message });
-    });
+        res.status(500).json({
+            success: false,
+            message: error.message || "Internal Server Error",
+            error: error.toString()
+        });
+    }
 };
 exports.updateUser = updateUser;
-// export {
-//   signup, 
-//   login, 
-//   logout, 
-//   getUsers, 
-//   getUserById, 
-//   deleteUser, 
-//   updateUser
-// };
+//# sourceMappingURL=userController.js.map

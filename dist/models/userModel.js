@@ -61,3 +61,4 @@ User.init({
 User.beforeCreate(async (user) => {
     user.password = await bcrypt_1.default.hash(user.password, 10);
 });
+//# sourceMappingURL=userModel.js.map

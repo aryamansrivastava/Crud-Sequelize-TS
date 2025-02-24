@@ -17,3 +17,4 @@ const dbConnection = async () => {
     }
 };
 exports.dbConnection = dbConnection;
+//# sourceMappingURL=database.js.map

@@ -49,3 +49,4 @@ router.get("/getuser/:id", userController.getUserById);
 router.get("/getallusers", userController.getUsers);
 router.delete("/delete/:id", userController.deleteUser);
 router.put("/update/:id", userController.updateUser);
+//# sourceMappingURL=user.js.map

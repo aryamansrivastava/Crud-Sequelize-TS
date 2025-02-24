@@ -38,6 +38,7 @@ app.use((0, express_session_1.default)({
 }));
 sessionStore.sync();
 app.use("/", user_1.router);
+app.use("/session", require("./routes/session"));
 app.listen(4000, async () => {
     console.log("Server is listening at port 4000");
     try {
@@ -46,7 +47,7 @@ app.listen(4000, async () => {
             .then(() => console.log("Database connected successfully!"))
             .catch((err) => {
             console.error("Database cannot be connected", err);
-            throw new Error(String(err));
+            throw new Error(err.toString());
         });
     }
     catch (e) {
@@ -54,3 +55,4 @@ app.listen(4000, async () => {
         process.exit(1);
     }
 });
+//# sourceMappingURL=app.js.map

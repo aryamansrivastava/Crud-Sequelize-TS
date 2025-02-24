@@ -39,7 +39,7 @@ export const signup = async (req: Request, res: Response) => {
       token = newUser.getJWT();
     } catch (error) {
       await newUser.destroy();
-      res.status(500).json({ message: "JWT_SECRET is missing or invalid" });
+      res.status(500).json({ message: "Token can't be generated"});
       return;
     }
 
@@ -64,7 +64,6 @@ export const signup = async (req: Request, res: Response) => {
     });
   }
 };
-
 
 export const login = async (req: Request, res: Response) => {
   try {
