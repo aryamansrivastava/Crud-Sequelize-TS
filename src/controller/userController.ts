@@ -3,6 +3,7 @@ import { userModel } from "../models/userModel";
 import validator from "validator";
 import {z} from "zod";
 import bcrypt from "bcryptjs";
+import SessionModel from "../models/sessionModel";
 
 const loginSchema = z.object({
   email: z.string().email({ message: "Invalid email format" }),
@@ -89,12 +90,18 @@ export const login = async (req: Request, res: Response) => {
 
     const token = user.getJWT();
 
+    const session = await SessionModel.create({
+      userId: user.id,
+      start_time: new Date(),
+    });
+
     req.session['user'] = {
       id: user.id,
       firstName: user.firstName,
       lastName: user.lastName,
       email: user.email,
-      token
+      token,
+      sessionStartTime: session.start_time,
     };
 
     res.cookie("token", token, { httpOnly: true, expires: new Date(Date.now() + 8 * 3600000) });
