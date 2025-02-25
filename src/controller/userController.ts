@@ -102,7 +102,7 @@ export const login = async (req: Request, res: Response) => {
       email: user.email,
       token,
       sessionStartTime: session.start_time,
-    };
+    } as { id: number; firstName: string; lastName: string; email: string; token: string; sessionStartTime: Date };
 
     res.cookie("token", token, { httpOnly: true, expires: new Date(Date.now() + 8 * 3600000) });
 
@@ -171,13 +171,35 @@ export const login = async (req: Request, res: Response) => {
   
       const { count, rows: users } = await userModel.findAndCountAll({
         attributes: ["id", "firstName", "lastName", "email", "createdAt", "updatedAt"],
+        include: [
+          {
+            model: SessionModel,
+            as: 'Sessions',
+            attributes: ["start_time"],
+            required: false,
+            limit: 1,
+            order: [["start_time", "DESC"]]
+          }
+        ],
         offset,
         limit,
         order: [["createdAt", "DESC"]]
       });
   
+      const formattedUsers = users.map((user: any) => ({
+        id: user.id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+        start_time: user.Sessions.length > 0 
+          ? user.Sessions[0].start_time 
+          : null
+      }));
+  
       res.status(200).json({
-        data: users,
+        data: formattedUsers,
         totalUsers: count,
         totalPages: Math.ceil(count / limit),
         currentPage
@@ -190,7 +212,7 @@ export const login = async (req: Request, res: Response) => {
         error: error.toString()
       });
     }
-  };
+  };  
   
   export const getUserById = async (req: Request, res: Response) => {
     try {

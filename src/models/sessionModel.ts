@@ -17,7 +17,7 @@ class SessionModel extends Model<SessionAttributes, SessionCreationAttributes> i
 }
 
 SessionModel.init(
-    {
+    { 
         id: {
             type: DataTypes.INTEGER,
             autoIncrement: true,
@@ -48,11 +48,13 @@ SessionModel.init(
 
 User.hasMany(SessionModel, {
     foreignKey: 'userId',
+    as: "Sessions",
     onDelete: 'CASCADE',
 });
 
 SessionModel.belongsTo(User, {
     foreignKey: 'userId',
+    as: "User"
 });
 
 export default SessionModel;
