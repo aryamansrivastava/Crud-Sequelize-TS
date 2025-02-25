@@ -7,6 +7,7 @@ import session from "express-session";
 import SequelizeStoreInit from "connect-session-sequelize";
 import cookieParser from "cookie-parser";
 import sessionRouter from "./routes/session";
+import deviceRouter from "./routes/devices";
 
 dotenv.config();
 
@@ -49,6 +50,7 @@ sessionStore.sync();
 
 app.use("/", userRouter);
 app.use("/sessions", sessionRouter);
+app.use("/devices", deviceRouter);
 
 app.listen(4000, async () => {
   console.log("Server is listening at port 4000");

@@ -1,6 +1,6 @@
 import { DataTypes, Model, Optional } from 'sequelize';
 import { sequelize } from '../config/database';
-import { userModel as User } from './userModel';
+import User from './userModel';
 
 interface SessionAttributes {
     id: number;
@@ -46,15 +46,15 @@ SessionModel.init(
     }
 );
 
-User.hasMany(SessionModel, {
-    foreignKey: 'userId',
-    as: "Sessions",
-    onDelete: 'CASCADE',
-});
+// User.hasMany(SessionModel, {
+//     foreignKey: 'userId',
+//     as: "Sessions",
+//     onDelete: 'CASCADE',
+// });
 
 SessionModel.belongsTo(User, {
     foreignKey: 'userId',
-    as: "User"
+    // as: "User"
 });
 
 export default SessionModel;

@@ -2,6 +2,7 @@ import { DataTypes, Model, Optional } from "sequelize";
 import { sequelize } from "../config/database";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
+import Device from "./deviceModel";
 
 interface UserAttributes {
   id?: number;
@@ -82,4 +83,9 @@ User.beforeCreate(async (user) => {
   user.password = await bcrypt.hash(user.password, 10);
 });
 
-export { User as userModel };
+User.hasMany(Device, {
+  foreignKey: "id",
+  as: "userId"
+});
+
+export default User;

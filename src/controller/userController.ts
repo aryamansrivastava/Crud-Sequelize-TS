@@ -1,9 +1,11 @@
 import { Request, Response } from "express";
-import { userModel } from "../models/userModel";
+import User from "../models/userModel";
 import validator from "validator";
 import {z} from "zod";
 import bcrypt from "bcryptjs";
 import SessionModel from "../models/sessionModel";
+import Device from "../models/deviceModel";
+import { getUserDevice } from "../utils/getUserDevice";
 
 const loginSchema = z.object({
   email: z.string().email({ message: "Invalid email format" }),
@@ -27,13 +29,13 @@ export const signup = async (req: Request, res: Response) => {
 
     const { firstName, lastName, email, password } = result.data;
 
-    const existingUser = await userModel.findOne({ where: { email } });
+    const existingUser = await User.findOne({ where: { email } });
     if (existingUser) {
       res.status(409).json({ message: "User already exists" });
       return;
     }
 
-    const newUser = await userModel.create({ firstName, lastName, email, password });
+    const newUser = await User.create({ firstName, lastName, email, password });
 
     let token: string;
     try {
@@ -76,7 +78,7 @@ export const login = async (req: Request, res: Response) => {
 
     const { email, password } = result.data;
 
-    const user = await userModel.findOne({ where: { email } });
+    const user = await User.findOne({ where: { email } });
     if (!user) {
       res.status(400).json({ message: "Invalid email credentials" });
       return;
@@ -103,6 +105,11 @@ export const login = async (req: Request, res: Response) => {
       token,
       sessionStartTime: session.start_time,
     } as { id: number; firstName: string; lastName: string; email: string; token: string; sessionStartTime: Date };
+
+    const device = await Device.create({
+      userId: user.id,
+      name: getUserDevice(req)
+    });
 
     res.cookie("token", token, { httpOnly: true, expires: new Date(Date.now() + 8 * 3600000) });
 
@@ -153,7 +160,7 @@ export const login = async (req: Request, res: Response) => {
         return;
       }
   
-      const newUser = await userModel.create({ firstName, lastName, email, password });
+      const newUser = await User.create({ firstName, lastName, email, password });
       res.status(201).json({ message: "User created successfully", user: newUser });
   
     } catch (error: any) {
@@ -169,7 +176,7 @@ export const login = async (req: Request, res: Response) => {
       const limit = parseInt(size as string) || 6;
       const offset = (currentPage - 1) * limit;
   
-      const { count, rows: users } = await userModel.findAndCountAll({
+      const users = await User.findAll({
         attributes: ["id", "firstName", "lastName", "email", "createdAt", "updatedAt"],
         include: [
           {
@@ -179,6 +186,12 @@ export const login = async (req: Request, res: Response) => {
             required: false,
             limit: 1,
             order: [["start_time", "DESC"]]
+          },
+          {
+            model: Device,
+            order: [["createdAt", "DESC"]],
+            limit: 1,
+            required: true
           }
         ],
         offset,
@@ -186,22 +199,22 @@ export const login = async (req: Request, res: Response) => {
         order: [["createdAt", "DESC"]]
       });
   
-      const formattedUsers = users.map((user: any) => ({
-        id: user.id,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        email: user.email,
-        createdAt: user.createdAt,
-        updatedAt: user.updatedAt,
-        start_time: user.Sessions.length > 0 
-          ? user.Sessions[0].start_time 
-          : null
-      }));
+      // const formattedUsers = users.map((user: any) => ({
+      //   id: user.id,
+      //   firstName: user.firstName,
+      //   lastName: user.lastName,
+      //   email: user.email,
+      //   createdAt: user.createdAt,
+      //   updatedAt: user.updatedAt,
+      //   start_time: user.Sessions.length > 0 
+      //     ? user.Sessions[0].start_time 
+      //     : null
+      // }));
   
       res.status(200).json({
-        data: formattedUsers,
-        totalUsers: count,
-        totalPages: Math.ceil(count / limit),
+        data: users,
+        totalUsers: users.length,
+        totalPages: Math.ceil(users.length / limit),
         currentPage
       });
     } catch (error: any) {
@@ -216,7 +229,7 @@ export const login = async (req: Request, res: Response) => {
   
   export const getUserById = async (req: Request, res: Response) => {
     try {
-      const user = await userModel.findByPk(req.params.id, {
+      const user = await User.findByPk(req.params.id, {
         attributes: ["id", "firstName", "lastName", "email", "createdAt", "updatedAt"]
       });
       if (!user) {
@@ -236,7 +249,7 @@ export const login = async (req: Request, res: Response) => {
   
   export const deleteUser = async (req: Request, res: Response) => {
     try {
-      const user = await userModel.findByPk(req.params.id);
+      const user = await User.findByPk(req.params.id);
       if (!user) {
         res.status(404).json({ message: "User not found" });
         return;
@@ -267,7 +280,7 @@ export const login = async (req: Request, res: Response) => {
         return;
       }
   
-      const user = await userModel.findByPk(req.params.id);
+      const user = await User.findByPk(req.params.id);
       if (!user) {
         res.status(404).json({ message: "User not found" });
         return;
