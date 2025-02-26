@@ -1,7 +1,7 @@
 import express, { Request, Response } from 'express';
-import Device from '../models/deviceModel';
 import { getUserDevice } from '../utils/getUserDevice';
 import {z} from "zod";
+import db from '../models/index';
 
 const deviceRouter = express.Router();
 
@@ -17,7 +17,7 @@ const createDeviceSchema = z.object({
 deviceRouter.get('/:id', async (req: Request, res: Response) => {
   try {
     const userId = parseInt(req.params.id);
-    const userDevices = await Device.findAll({
+    const userDevices = await db.models.Device.findAll({
       where: { userId },
       attributes: ['name'],
     });
@@ -43,7 +43,7 @@ deviceRouter.post('/', async (req: Request, res: Response) => {
     try {
     //   console.log('Request Body:', req.body);
       const { name, userId } = req.body;
-      const newDevice = await Device.create({
+      const newDevice = await db.models.Device.create({
         name,
         userId
       });

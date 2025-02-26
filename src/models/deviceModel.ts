@@ -1,6 +1,6 @@
-import { DataTypes, Model, Optional } from 'sequelize';
-import {sequelize} from '../config/database';
-import User from './userModel';
+import { DataTypes, Model, Optional } from "sequelize";
+import { sequelize } from "../config/database";
+import User from "./userModel";
 
 interface DeviceAttributes {
   id: number;
@@ -8,15 +8,25 @@ interface DeviceAttributes {
   userId: number;
 }
 
-interface DeviceCreationAttributes extends Optional<DeviceAttributes, 'id'> {}
+interface DeviceCreationAttributes extends Optional<DeviceAttributes, "id"> {}
 
-class Device extends Model<DeviceAttributes, DeviceCreationAttributes> implements DeviceAttributes {
+class Device
+  extends Model<DeviceAttributes, DeviceCreationAttributes>
+  implements DeviceAttributes
+{
   public id!: number;
   public name!: string;
   public userId!: number;
 
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
+
+  static associate(models: any) {
+    models.User.hasMany(models.Device, { foreignKey: "userId", 
+      // as: "devices"
+     });
+    models.Device.belongsTo(models.User, { foreignKey: "userId" });
+  }
 }
 
 Device.init(
@@ -35,19 +45,19 @@ Device.init(
       allowNull: false,
       references: {
         model: User,
-        key: 'id',
+        key: "id",
       },
     },
   },
   {
     sequelize,
-    modelName: 'Device',
+    modelName: "Device",
   }
 );
 
-Device.belongsTo(User, {
-  foreignKey: 'userId',
-  // as: 'user',
-});
+// Device.belongsTo(User, {
+//   foreignKey: 'userId',
+//   as: 'user',
+// });
 
 export default Device;

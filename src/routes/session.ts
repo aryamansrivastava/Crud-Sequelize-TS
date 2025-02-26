@@ -1,6 +1,6 @@
 import express, { Request, Response } from "express";
-import SessionModel from "../models/sessionModel";
 import { z } from "zod";
+import db from '../models/index';
 
 const sessionRouter = express.Router();
 
@@ -12,7 +12,7 @@ const startSessionSchema = z.object({
 sessionRouter.post("/start", async (req: Request, res: Response) => {
   try {
     const { userId, start_time } = startSessionSchema.parse(req.body);
-    const session = await SessionModel.create({
+    const session = await db.models.Session.create({
       userId,
       start_time: new Date(start_time),
     });
@@ -42,7 +42,7 @@ sessionRouter.post("/start", async (req: Request, res: Response) => {
 
 sessionRouter.get("/:id", async (req: Request, res: Response) => {
   try {
-    const session = await SessionModel.findByPk(req.params.id);
+    const session = await db.models.Session.findByPk(req.params.id);
     res.status(200).json({
         status: "success", 
         message: "Session retrieved successfully", 

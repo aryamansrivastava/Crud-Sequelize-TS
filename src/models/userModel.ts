@@ -16,7 +16,10 @@ interface UserAttributes {
 
 interface UserCreationAttributes extends Optional<UserAttributes, "id"> {}
 
-class User extends Model<UserAttributes, UserCreationAttributes> implements UserAttributes {
+class User
+  extends Model<UserAttributes, UserCreationAttributes>
+  implements UserAttributes
+{
   public id!: number;
   public firstName!: string;
   public lastName!: string;
@@ -33,9 +36,22 @@ class User extends Model<UserAttributes, UserCreationAttributes> implements User
     if (!process.env.JWT_SECRET) {
       throw new Error("JWT_SECRET is not defined");
     }
-    return jwt.sign({ id: this.id, email: this.email }, process.env.JWT_SECRET, {
-      expiresIn: "8h",
-    });
+    return jwt.sign(
+      { id: this.id, email: this.email },
+      process.env.JWT_SECRET,
+      {
+        expiresIn: "8h",
+      }
+    );
+  }
+
+  static associate(models: any) {
+    models.User.hasMany(models.Session, { foreignKey: "userId", 
+      as: "Sessions"
+     });
+    // models.User.hasMany(models.Device, { foreignKey: "userId", 
+    //   // as: "devices"
+    //  });
   }
 }
 
@@ -79,13 +95,17 @@ User.init(
   }
 );
 
-User.beforeCreate(async (user) => {
-  user.password = await bcrypt.hash(user.password, 10);
-});
+// User.beforeCreate(async (user) => {
+//   user.password = await bcrypt.hash(user.password, 10);
+// });
 
-User.hasMany(Device, {
-  foreignKey: "id",
-  as: "userId"
-});
+// User.hasMany(SessionModel,
+//   {foreignKey: "userId", as: "sessions"}
+// )
+
+// User.hasMany(Device, {
+//   foreignKey: "userId",
+//   // as: "devices"
+// });
 
 export default User;
