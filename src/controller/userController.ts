@@ -251,7 +251,7 @@ export const getUsers = async (req: Request, res: Response) => {
     });
     let { page, size } = validated.query;
     const currentPage = parseInt(page as string) || 1;
-    const limit = parseInt(size as string) || 6;
+    const limit = parseInt(size as string) || 15;
     const offset = (currentPage - 1) * limit;
 
     const users = await db.models.User.findAll({
