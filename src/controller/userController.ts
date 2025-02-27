@@ -249,9 +249,9 @@ export const getUsers = async (req: Request, res: Response) => {
     const validated = getUsersSchema.parse({
       query: req.query,
     });
-    let { page, size } = validated.query;
-    const currentPage = parseInt(page as string) || 1;
-    const limit = parseInt(size as string) || 15;
+    let { page=1, size=10 } = validated.query;
+    const currentPage = Math.max(parseInt(page as string) || 1);
+    const limit = Math.max(parseInt(size as string), 1);
     const offset = (currentPage - 1) * limit;
 
     const users = await db.models.User.findAll({
@@ -274,15 +274,14 @@ export const getUsers = async (req: Request, res: Response) => {
         },
         {
           model: db.models.Device,
-          // as: "devices",
           attributes: ["name"],
           order: [["createdAt", "DESC"]],
           limit: 1,
-          required: true,
+          required: false,
         },
       ],
-      offset,
       limit,
+      offset, 
       order: [["createdAt", "DESC"]],
     });
 
@@ -298,11 +297,20 @@ export const getUsers = async (req: Request, res: Response) => {
     //     : null
     // }));
 
+    const totalUsers = await db.models.User.count();
+    const totalPages = Math.ceil(totalUsers / limit);
+    const start = offset + 1;
+    const end = Math.min(offset + limit, totalUsers);
+
     res.status(200).json({
       data: users,
-      totalUsers: users.length,
-      totalPages: Math.ceil(users.length / limit),
-      currentPage,
+      totalUsers,
+      totalPages,
+      currentPage : currentPage,
+      hasNextPage: currentPage < totalPages,
+      hasPrevPage: currentPage > 1,
+      start,
+      end,
     });
   } catch (error: any) {
     if (error instanceof z.ZodError) {
