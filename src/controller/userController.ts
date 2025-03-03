@@ -285,18 +285,6 @@ export const getUsers = async (req: Request, res: Response) => {
       order: [["createdAt", "DESC"]],
     });
 
-    // const formattedUsers = users.map((user: any) => ({
-    //   id: user.id,
-    //   firstName: user.firstName,
-    //   lastName: user.lastName,
-    //   email: user.email,
-    //   createdAt: user.createdAt,
-    //   updatedAt: user.updatedAt,
-    //   start_time: user.Sessions.length > 0
-    //   user.Sessions[0].start_time
-    //     : null
-    // }));
-
     const totalUsers = await db.models.User.count();
     const totalPages = Math.ceil(totalUsers / limit);
     const start = offset + 1;
