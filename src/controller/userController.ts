@@ -3,6 +3,7 @@ import { z } from "zod";
 import bcrypt from "bcryptjs";
 import db from "../models/index";
 import { getUserDevice } from "../utils/getUserDevice";
+import { Op } from "sequelize";
 
 const loginSchema = z.object({
   email: z.string().email({ message: "Invalid email format" }),
@@ -249,10 +250,80 @@ export const getUsers = async (req: Request, res: Response) => {
     const validated = getUsersSchema.parse({
       query: req.query,
     });
-    let { page=1, size=10 } = validated.query;
+    let { page=1, size=10, search="", filter="{}" } = req.query as {
+      page?: string;
+      size?: string;
+      search?: string;
+      filter?: string;
+    };
     const currentPage = Math.max(parseInt(page as string) || 1);
     const limit = Math.max(parseInt(size as string), 1);
     const offset = (currentPage - 1) * limit;
+
+    const includeConditions: any[] = [];
+    const whereCondition: any = {};
+
+    if (search) {
+      whereCondition[Op.or] = [
+        { firstName: { [Op.like]: `%${search}%` } },
+        { lastName: { [Op.like]: `%${search}%` } },
+        { email: { [Op.like]: `%${search}%` } },
+      ];
+    }
+
+  try {
+      const parsedFilter = JSON.parse(filter);
+
+      if (parsedFilter.firstName) {
+        whereCondition.firstName = { [Op.like]: `%${parsedFilter.firstName}%` };
+      }
+      if (parsedFilter.lastName) {
+        whereCondition.lastName = { [Op.like]: `%${parsedFilter.lastName}%` };
+      }
+      if (parsedFilter.email) {
+        whereCondition.email = { [Op.like]: `%${parsedFilter.email}%` };
+      }
+      if (parsedFilter.createdAt) {
+        whereCondition.createdAt = { [Op.gte]: new Date(parsedFilter.createdAt) };
+      }
+      if (parsedFilter.lastLogin) {
+        includeConditions.push({
+          model: db.models.Session,
+          as: "Sessions",
+          attributes: ["start_time"],
+          required: true,
+          where: {
+            start_time: { [Op.gte]: new Date(parsedFilter.lastLogin) },
+          },
+        });
+      } 
+      else {
+        includeConditions.push({
+          model: db.models.Session,
+          as: "Sessions",
+          attributes: ["start_time"],
+          required: false,
+          limit: 1,
+          order: [["start_time", "DESC"]],
+        });
+      }
+      if (parsedFilter.deviceName) {
+        includeConditions.push({
+          model: db.models.Device,
+          attributes: ["name"],
+          where: { name: { [Op.like]: `%${parsedFilter.deviceName}%` } },
+          required: true, 
+        });
+      } else {
+        includeConditions.push({
+          model: db.models.Device,
+          attributes: ["name"],
+          required: false,
+        });
+      }
+    } catch (error) {
+      return res.status(400).json({ message: "Invalid filter format" });
+    }
 
     const users = await db.models.User.findAll({
       attributes: [
@@ -263,29 +334,14 @@ export const getUsers = async (req: Request, res: Response) => {
         "createdAt",
         "updatedAt",
       ],
-      include: [
-        {
-          model: db.models.Session,
-          as: "Sessions",
-          attributes: ["start_time"],
-          required: false,
-          limit: 1,
-          order: [["start_time", "DESC"]],
-        },
-        {
-          model: db.models.Device,
-          attributes: ["name"],
-          order: [["createdAt", "DESC"]],
-          limit: 1,
-          required: false,
-        },
-      ],
+      include: includeConditions,
+      where: whereCondition,
       limit,
       offset, 
       order: [["createdAt", "DESC"]],
     });
 
-    const totalUsers = await db.models.User.count();
+    const totalUsers = await db.models.User.count({ where: whereCondition });
     const totalPages = Math.ceil(totalUsers / limit);
     const start = offset + 1;
     const end = Math.min(offset + limit, totalUsers);

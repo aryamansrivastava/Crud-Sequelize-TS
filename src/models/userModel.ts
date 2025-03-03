@@ -50,7 +50,7 @@ class User
       as: "Sessions"
      });
     // models.User.hasMany(models.Device, { foreignKey: "userId", 
-    //   // as: "devices"
+    //  as: "devices"
     //  });
   }
 }
