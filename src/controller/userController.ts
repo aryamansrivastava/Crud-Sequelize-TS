@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import db from "../models/index";
 import { getUserDevice } from "../utils/getUserDevice";
 import { Op } from "sequelize";
+import jwt from "jsonwebtoken";
 
 const loginSchema = z.object({
   email: z.string().email({ message: "Invalid email format" }),
@@ -48,6 +49,25 @@ const updateUserSchema = z.object({
     .min(6, { message: "Password must be at least 6 characters long" })
     .optional(),
 });
+
+export const verifyToken = async(req: Request, res: Response) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith("Bearer ")) {
+    res.status(401).json({ message: "Token required" });
+    return;
+  }
+
+  const token = authHeader.split("Bearer ")[1];
+
+  try {
+    jwt.verify(token, process.env.JWT_SECRET as string);
+    res.status(200).json({ message: "Token is valid" });
+    return;
+  } catch (err) {
+    res.status(401).json({ message: "Invalid or expired token" });
+    return;
+  }
+}
 
 export const signup = async (req: Request, res: Response) => {
   try {
@@ -425,16 +445,6 @@ export const updateUser = async (req: Request, res: Response) => {
     const validatedData = updateUserSchema.parse(req.body);
 
     const { firstName, lastName, email, password } = req.body;
-
-    // if (!firstName || !lastName || !email) {
-    //   res.status(400).json({ message: "First name, last name, and email are required" });
-    //   return;
-    // }
-
-    // if (!validator.isEmail(email)) {
-    //   res.status(400).json({ message: "Invalid email format" });
-    //   return;
-    // }
 
     const user = await db.models.User.findByPk(req.params.id);
     if (!user) {

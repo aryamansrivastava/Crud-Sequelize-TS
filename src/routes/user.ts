@@ -6,19 +6,17 @@ import { isAuthenticated } from "../middlewares/auth";
 const router: Router = express.Router();
 
 router.post("/signup", userController.signup);
-
 router.post("/login", [apiLimiter, userController.login]);
+router.post("/logout", [isAuthenticated, userController.logout]);
 
-router.post("/logout", [userController.logout]);
-
-router.post("/create", userController.createUser);
+router.post("/create", [isAuthenticated, userController.createUser]);
 
 router.get("/getuser/:id", [isAuthenticated, apiLimiter, userController.getUserById]);
-
 router.get("/getallusers", [isAuthenticated, apiLimiter, userController.getUsers]);
 
-router.delete("/delete/:id", userController.deleteUser);
+router.delete("/delete/:id", [isAuthenticated, userController.deleteUser]);
+router.put("/update/:id", [isAuthenticated, userController.updateUser]);
 
-router.put("/update/:id", userController.updateUser);
+router.get("/verify-token", isAuthenticated, userController.verifyToken);
 
 export { router };
